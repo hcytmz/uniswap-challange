@@ -27,6 +27,10 @@ const WORK_FACTOR: u128 = (WORK_SIZE as u128) / 1_000_000;
 const CONTROL_CHARACTER: u8 = 0xff;
 const MAX_INCREMENTER: u64 = 0xffffffffffff;
 
+const FACTORY_ADDRESS: [u8; 20] = hex!("48E516B34A1274f49457b9C6182097796D0498Cb");
+const CALLING_ADDRESS: [u8; 20] = hex!("0000007B168966dbD0a9E7C05c69Ebcb4c318c9a");
+const INIT_CODE_HASH: [u8; 32] = hex!("94d114296a5af85c1fd2dc039cdaa32f1ed4b0fe0868f02d888bfc91feb645d9");
+
 static KERNEL_SRC: &str = include_str!("./kernels/keccak256.cl");
 
 /// Requires three hex-encoded arguments: the address of the contract that will
@@ -46,22 +50,11 @@ pub struct Config {
     pub leading_zeroes_threshold: u8,
     pub total_zeroes_threshold: u8,
 }
-
 /// Validate the provided arguments and construct the Config struct.
 impl Config {
     pub fn new(mut args: std::env::Args) -> Result<Self, &'static str> {
         // get args, skipping first arg (program name)
         args.next();
-
-        let Some(factory_address_string) = args.next() else {
-            return Err("didn't get a factory_address argument");
-        };
-        let Some(calling_address_string) = args.next() else {
-            return Err("didn't get a calling_address argument");
-        };
-        let Some(init_code_hash_string) = args.next() else {
-            return Err("didn't get an init_code_hash argument");
-        };
 
         let gpu_device_string = match args.next() {
             Some(arg) => arg,
@@ -74,28 +67,6 @@ impl Config {
         let total_zeroes_threshold_string = match args.next() {
             Some(arg) => arg,
             None => String::from("5"),
-        };
-
-        // convert main arguments from hex string to vector of bytes
-        let Ok(factory_address_vec) = hex::decode(factory_address_string) else {
-            return Err("could not decode factory address argument");
-        };
-        let Ok(calling_address_vec) = hex::decode(calling_address_string) else {
-            return Err("could not decode calling address argument");
-        };
-        let Ok(init_code_hash_vec) = hex::decode(init_code_hash_string) else {
-            return Err("could not decode initialization code hash argument");
-        };
-
-        // convert from vector to fixed array
-        let Ok(factory_address) = factory_address_vec.try_into() else {
-            return Err("invalid length for factory address argument");
-        };
-        let Ok(calling_address) = calling_address_vec.try_into() else {
-            return Err("invalid length for calling address argument");
-        };
-        let Ok(init_code_hash) = init_code_hash_vec.try_into() else {
-            return Err("invalid length for initialization code hash argument");
         };
 
         // convert gpu arguments to u8 values
@@ -117,9 +88,9 @@ impl Config {
         }
 
         Ok(Self {
-            factory_address,
-            calling_address,
-            init_code_hash,
+            factory_address: FACTORY_ADDRESS,
+            calling_address: CALLING_ADDRESS,
+            init_code_hash: INIT_CODE_HASH,
             gpu_device,
             leading_zeroes_threshold,
             total_zeroes_threshold,
@@ -199,31 +170,31 @@ pub fn cpu(config: Config) -> Result<(), Box<dyn Error>> {
 
     // begin searching for addresses
     loop {
-        // header: 0xff ++ factory ++ caller ++ salt_random_segment (47 bytes)
-        let mut header = [0; 47];
-        header[0] = CONTROL_CHARACTER;
-        header[1..21].copy_from_slice(&config.factory_address);
-        header[21..41].copy_from_slice(&config.calling_address);
-        header[41..].copy_from_slice(&FixedBytes::<6>::random()[..]);
-
-        // create new hash object
-        let mut hash_header = Keccak::v256();
-
-        // update hash with header
-        hash_header.update(&header);
-
         // iterate over a 6-byte nonce and compute each address
         (0..MAX_INCREMENTER)
             .into_par_iter() // parallelization
-            .for_each(|salt| {
-                let salt = salt.to_le_bytes();
-                let salt_incremented_segment = &salt[..6];
+            .for_each(|_| {
+                let mut header = [0; 47];
+                header[0] = CONTROL_CHARACTER;
+                header[1..21].copy_from_slice(&config.factory_address);
+                header[21..41].copy_from_slice(&config.calling_address);
+
+                let random_bytes: [u8; 6] = rand::random();
+                header[41..].copy_from_slice(&random_bytes);
+
+                // create new hash object
+                let mut hash_header = Keccak::v256();
+
+                // update hash with header
+                hash_header.update(&header);
+
+                let salt: [u8; 6] = rand::random();
 
                 // clone the partially-hashed object
                 let mut hash = hash_header.clone();
 
                 // update with body and footer (total: 38 bytes)
-                hash.update(salt_incremented_segment);
+                hash.update(&salt);
                 hash.update(&config.init_code_hash);
 
                 // hash the payload and get the result
@@ -234,16 +205,16 @@ pub fn cpu(config: Config) -> Result<(), Box<dyn Error>> {
                 let address = <&Address>::try_from(&res[12..]).unwrap();
                 let address_score = score_address(&(*address.0));
 
-                if address_score < 130 {
+                if address_score < 110 {
                     return;
                 }
 
                 // get the full salt used to create the address
                 let header_hex_string = hex::encode(header);
-                let body_hex_string = hex::encode(salt_incremented_segment);
+                let body_hex_string = hex::encode(salt);
                 let full_salt = format!("0x{}{}", &header_hex_string[42..], &body_hex_string);
 
-                // display the salt and the address.
+                // display the salt and the address
                 let output = format!(
                     "{full_salt} => {address} => {}",
                     address_score
@@ -262,6 +233,7 @@ pub fn cpu(config: Config) -> Result<(), Box<dyn Error>> {
             });
     }
 }
+
 
 /// Given a Config object with a factory address, a caller address, a keccak-256
 /// hash of the contract initialization code, and a device ID, search for salts

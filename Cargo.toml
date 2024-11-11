@@ -25,6 +25,14 @@ strip = true
 panic = "abort"
 codegen-units = 1
 
+[lib]
+name = "create2crunch"
+path = "src/lib.rs"
+
+[[bin]]
+name = "create2crunch"
+path = "src/main.rs"
+
 [features]
 default = []
 asm = ["alloy-primitives/asm-keccak"]
