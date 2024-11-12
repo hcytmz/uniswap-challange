@@ -6,24 +6,26 @@ edition = "2021"
 rust-version = "1.65"
 
 [dependencies]
-alloy-primitives = { version = "0.5", features = ["rand"] }
-byteorder = "1.5"
-console = "0.15"
-fs4 = "0.7"
-ocl = "0.19"
+alloy-primitives = { version = "0.8.11", features = ["rand"] }
+console = "0.15.8"
+fs4 = "0.8"
+ocl = "0.19.7"
 rand = "0.8"
-rayon = "1.0"
-rustc-hash = "1.1"
+rustc-hash = "2.0"
 separator = "0.4.1"
-terminal_size = "0.3.0"
-tiny-keccak = "2.0"
+terminal_size = "0.4.0"
 
 [profile.release]
 opt-level = 3
 lto = "fat"
-strip = true
+debug = "line-tables-only"
+strip = "debuginfo"
 panic = "abort"
 codegen-units = 1
+
+[features]
+default = ["asm"]
+asm = ["alloy-primitives/asm-keccak"]
 
 [lib]
 name = "create2crunch"
@@ -32,7 +34,3 @@ path = "src/lib.rs"
 [[bin]]
 name = "create2crunch"
 path = "src/main.rs"
-
-[features]
-default = []
-asm = ["alloy-primitives/asm-keccak"]
