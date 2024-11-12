@@ -171,8 +171,9 @@ fn cpu_task(
         let header_hex_string = hex::encode(header);
         let body_hex_string = hex::encode(salt_incremented_segment);
         let full_salt = format!("0x{}{}", &header_hex_string[42..], &body_hex_string);
+        let time = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
-        let output = format!("{full_salt} => {address} => {address_score}");
+        let output = format!("{full_salt} => {address} => {address_score} | {time}");
         println!("{output}");
 
         file.lock_exclusive().expect("Couldn't lock file.");
