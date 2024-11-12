@@ -38,8 +38,6 @@ pub struct Config {
     pub calling_address: [u8; 20],
     pub init_code_hash: [u8; 32],
     pub gpu_device: u8,
-    pub leading_zeroes_threshold: u8,
-    pub total_zeroes_threshold: u8,
 }
 
 impl Config {
@@ -51,31 +49,12 @@ impl Config {
             .unwrap_or_else(|| "255".to_string())
             .parse::<u8>()
             .map_err(|_| "invalid gpu device value")?;
-        let leading_zeroes_threshold = args
-            .next()
-            .unwrap_or_else(|| "3".to_string())
-            .parse::<u8>()
-            .map_err(|_| "invalid leading zeroes threshold value supplied")?;
-        let total_zeroes_threshold = args
-            .next()
-            .unwrap_or_else(|| "5".to_string())
-            .parse::<u8>()
-            .map_err(|_| "invalid total zeroes threshold value supplied")?;
-
-        if leading_zeroes_threshold > 20 {
-            return Err("invalid value for leading zeroes threshold argument. (valid: 0..=20)");
-        }
-        if total_zeroes_threshold > 20 && total_zeroes_threshold != 255 {
-            return Err("invalid value for total zeroes threshold argument. (valid: 0..=20 | 255)");
-        }
 
         Ok(Self {
             factory_address: FACTORY_ADDRESS,
             calling_address: CALLING_ADDRESS,
             init_code_hash: INIT_CODE_HASH,
             gpu_device,
-            leading_zeroes_threshold,
-            total_zeroes_threshold,
         })
     }
 }
@@ -269,7 +248,6 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
                 }
                 view_buf.copy_from_slice(&((nonce as u64) << 32).to_le_bytes());
                 let height = terminal_size().map(|(_w, Height(h))| h).unwrap_or(10);
-
                 term.write_line(&format!(
                     "total runtime: {}:{:02}:{:02} ({} cycles)\t\t\t\
                      work size per cycle: {}",
@@ -286,12 +264,9 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
                     found
                 ))?;
                 term.write_line(&format!(
-                    "current search space: {}xxxxxxxx{:08x}\t\t\
-                     threshold: {} leading or {} total zeroes",
+                    "current search space: {}xxxxxxxx{:08x}",
                     hex::encode(salt),
                     u64::from_be_bytes(view_buf),
-                    config.leading_zeroes_threshold,
-                    config.total_zeroes_threshold
                 ))?;
                 let rows = if height < 5 { 1 } else { height as usize - 4 };
                 let last_rows: Vec<String> = found_list.iter().cloned().rev().take(rows).collect();
@@ -342,10 +317,6 @@ pub fn gpu(config: Config) -> ocl::Result<()> {
             let address = <&Address>::try_from(&res[12..]).unwrap();
             let address_score = AddressScore::calculate(&(*address.0)).score;
 
-            if address_score < 130 {
-                continue;
-            }
-
             let output = format!(
                 "0x{}{}{} => {} => {}",
                 hex::encode(config.calling_address),
@@ -386,10 +357,6 @@ fn mk_kernel_src(config: &Config) -> String {
     for (i, x) in factory.chain(caller).enumerate().chain(hash) {
         writeln!(src, "#define S_{} {}u", i + 1, x).unwrap();
     }
-    let lz = config.leading_zeroes_threshold;
-    writeln!(src, "#define LEADING_ZEROES {lz}").unwrap();
-    let tz = config.total_zeroes_threshold;
-    writeln!(src, "#define TOTAL_ZEROES {tz}").unwrap();
 
     src.push_str(KERNEL_SRC);
 

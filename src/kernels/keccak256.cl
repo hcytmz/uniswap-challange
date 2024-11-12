@@ -1,35 +1,3 @@
-/*
-   Copyright 2018 Lip Wee Yeo Amano
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
-
-/**
-* Based on the following, with small tweaks and optimizations:
-*
-* https://github.com/lwYeo/SoliditySHA3Miner/blob/master/SoliditySHA3Miner/
-*   Miner/Kernels/OpenCL/sha3KingKernel.cl
-*
-* Originally modified for openCL processing by lwYeo
-*
-* Original implementor: David Leon Gil
-*
-* License: CC0, attribution kindly requested. Blame taken too, but not
-* liability.
-*/
-
-/******** Keccak-f[1600] (for finding efficient Ethereum addresses) ********/
-
 #define OPENCL_PLATFORM_UNKNOWN 0
 #define OPENCL_PLATFORM_AMD   2
 
@@ -188,40 +156,7 @@ static inline void keccakf(ulong *a)
 #undef o
 }
 
-#define hasTotal(d) ( \
-  (!(d[0])) + (!(d[1])) + (!(d[2])) + (!(d[3])) + \
-  (!(d[4])) + (!(d[5])) + (!(d[6])) + (!(d[7])) + \
-  (!(d[8])) + (!(d[9])) + (!(d[10])) + (!(d[11])) + \
-  (!(d[12])) + (!(d[13])) + (!(d[14])) + (!(d[15])) + \
-  (!(d[16])) + (!(d[17])) + (!(d[18])) + (!(d[19])) \
->= TOTAL_ZEROES)
-
-#if LEADING_ZEROES == 8
-#define hasLeading(d) (!(((uint*)d)[0]) && !(((uint*)d)[1]))
-#elif LEADING_ZEROES == 7
-#define hasLeading(d) (!(((uint*)d)[0]) && !(((uint*)d)[1] & 0x00ffffffu))
-#elif LEADING_ZEROES == 6
-#define hasLeading(d) (!(((uint*)d)[0]) && !(((uint*)d)[1] & 0x0000ffffu))
-#elif LEADING_ZEROES == 5
-#define hasLeading(d) (!(((uint*)d)[0]) && !(((uint*)d)[1] & 0x000000ffu))
-#elif LEADING_ZEROES == 4
-#define hasLeading(d) (!(((uint*)d)[0]))
-#elif LEADING_ZEROES == 3
 #define hasLeading(d) (!(((uint*)d)[0] & 0x00ffffffu))
-#elif LEADING_ZEROES == 2
-#define hasLeading(d) (!(((uint*)d)[0] & 0x0000ffffu))
-#elif LEADING_ZEROES == 1
-#define hasLeading(d) (!(((uint*)d)[0] & 0x000000ffu))
-#else
-static inline bool hasLeading(uchar const *d)
-{
-#pragma unroll
-  for (uint i = 0; i < LEADING_ZEROES; ++i) {
-    if (d[i] != 0) return false;
-  }
-  return true;
-}
-#endif
 
 __kernel void hashMessage(
   __constant uchar const *d_message,
@@ -352,16 +287,7 @@ __kernel void hashMessage(
   keccakf(spongeBuffer);
 
   // determine if the address meets the constraints
-  if (
-    hasLeading(digest) 
-#if TOTAL_ZEROES <= 20
-    || hasTotal(digest)
-#endif
-  ) {
-    // To be honest, if we are using OpenCL, 
-    // we just need to write one solution for all practical purposes,
-    // since the chance of multiple solutions appearing
-    // in a single workset is extremely low.
+ if (hasLeading(digest)) {
     solutions[0] = nonce.uint64_t;
   }
 }
