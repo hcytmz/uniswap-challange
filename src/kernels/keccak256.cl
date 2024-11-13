@@ -156,7 +156,14 @@ static inline void keccakf(ulong *a)
 #undef o
 }
 
-#define hasLeading(d) (!(((uint*)d)[0] & 0x00ffffffu))
+#define hasLeading(d) (!(((uint*)d)[0]))
+
+#define hasPattern(d) \
+  ((((uint*)d)[1] & 0x0000ffffu) == 0x00004444u || \
+   (((uint*)d)[1] & 0x00f0ffffu) == 0x00404404u || \
+   (((uint*)d)[1] & 0x00ffffffu) == 0x00444400u || \
+   (((uint*)d)[1] & 0xf0ffffffu) == 0x40440400u || \
+   (((uint*)d)[1] & 0xffffffffu) == 0x44444000u)
 
 __kernel void hashMessage(
   __constant uchar const *d_message,
@@ -287,7 +294,7 @@ __kernel void hashMessage(
   keccakf(spongeBuffer);
 
   // determine if the address meets the constraints
- if (hasLeading(digest)) {
+  if (hasLeading(digest) && hasPattern(digest)) {
     solutions[0] = nonce.uint64_t;
   }
 }
