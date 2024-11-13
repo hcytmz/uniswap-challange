@@ -158,12 +158,19 @@ static inline void keccakf(ulong *a)
 
 #define hasLeading(d) (!(((uint*)d)[0]))
 
-#define hasPattern(d) \
-  ((((uint*)d)[1] & 0x0000ffffu) == 0x00004444u || \
-   (((uint*)d)[1] & 0x00f0ffffu) == 0x00404404u || \
-   (((uint*)d)[1] & 0x00ffffffu) == 0x00444400u || \
-   (((uint*)d)[1] & 0xf0ffffffu) == 0x40440400u || \
-   (((uint*)d)[1] & 0xffffffffu) == 0x44444000u)
+#define hasPattern(d) ({ \
+    uint value = ((uint*)d)[1]; \
+    uint mask1 = 0x0000ffffu; \
+    uint mask2 = 0x00f0ffffu; \
+    uint mask3 = 0x00ffffffu; \
+    uint mask4 = 0xf0ffffffu; \
+    uint mask5 = 0xffffffffu; \
+    ( (value & mask1) == 0x00004444u || \
+      (value & mask2) == 0x00404404u || \
+      (value & mask3) == 0x00444400u || \
+      (value & mask4) == 0x40440400u || \
+      (value & mask5) == 0x44444000u ); \
+})
 
 __kernel void hashMessage(
   __constant uchar const *d_message,
