@@ -169,7 +169,7 @@ static inline void keccakf(ulong *a)
       (value & mask2) == 0x00404404u || \
       (value & mask3) == 0x00444400u || \
       (value & mask4) == 0x40440400u || \
-      (value & mask5) == 0x44444000u ); \
+      (value & mask5) == 0x44440000u ); \
 })
 
 __kernel void hashMessage(
