@@ -22,6 +22,10 @@ This project is a modified version of the original `create2crunch` tool by [`0ag
    ```sh
    docker run -d --name uniswap-container uniswap-challange
    ```
+4. **Check Logs**:
+   ```sh
+   docker logs --follow uniswap-container
+   ```
 
 ### Local Setup
 Alternatively, you can run it locally with Rust installed:
